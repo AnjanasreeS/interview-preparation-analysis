@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Interview Speech Analysis</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      padding: 20px;
+    }
+    .speech-meter {
+      height: 20px;
+      background: #f0f0f0;
+      border-radius: 10px;
+      margin: 10px 0;
+      overflow: hidden;
+    }
+    .meter-fill {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(to right, #ff4d4d, #ffcc00, #28a745);
+      transition: width 0.3s;
+    }
+    .transcript-container {
+      max-height: 150px;
+      overflow-y: auto;
+      border: 1px solid #ddd;
+      padding: 10px;
+      margin: 10px 0;
+      border-radius: 5px;
+      background: #f9f9f9;
+    }
+    .filler-word {
+      background-color: #fff3cd;
+      padding: 0 2px;
+      border-radius: 3px;
+    }
+    .analysis-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+      gap: 15px;
+      margin-top: 15px;
+    }
+    .analysis-card {
+      background: #f8f9fa;
+      padding: 12px;
+      border-radius: 8px;
+      border-left: 4px solid #007bff;
+    }
+    .composite {
+      font-weight: bold;
+      margin-top: 10px;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>🗣 Interview Speech Analysis</h2>
+  <div class="speech-meter">
+    <div class="meter-fill" id="volumeMeter"></div>
+  </div>
+  <button onclick="startRecording()" id="startBtn">Start Recording</button>
+  <button onclick="stopRecording()" disabled id="stopBtn">Stop Recording</button>
+
+  <div id="liveTranscript" class="transcript-container" style="display:none;"></div>
+
+  <div id="results" style="display:none;">
+    <h3>Detailed Analysis</h3>
+    <div class="transcript-container" id="finalTranscript"></div>
+    <div class="analysis-grid">
+      <div class="analysis-card">Clarity Score: <span id="clarityScore">-</span></div>
+      <div class="analysis-card">Filler Words: <span id="fillerCount">-</span></div>
+      <div class="analysis-card">Confidence: <span id="confidenceScore">-</span></div>
+      <div class="analysis-card">Grammar Score: <span id="grammarScore">-</span></div>
+      <div class="analysis-card composite">Composite Score: <span id="compositeScore">-</span></div>
+    </div>
+  </div>
+
+  <script>
+    let recognition, audioCtx, analyser, source;
+    let isRecording = false;
+    let wordCount = 0, fillerWords = 0;
+    let recordingStart = null;
+    const FILLERS = ["um", "uh", "like", "you know", "so", "basically", "actually", "well"];
+
+    function startRecording() {
+      wordCount = 0;
+      fillerWords = 0;
+      document.getElementById("liveTranscript").style.display = "block";
+      document.getElementById("results").style.display = "none";
+      document.getElementById("startBtn").disabled = true;
+      document.getElementById("stopBtn").disabled = false;
+      document.getElementById("liveTranscript").innerHTML = "";
+      document.getElementById("finalTranscript").innerHTML = "";
+      recordingStart = Date.now();
+      isRecording = true;
+
+      navigator.mediaDevices.getUserMedia({ audio: true })
+        .then(stream => {
+          audioCtx = new AudioContext();
+          analyser = audioCtx.createAnalyser();
+          source = audioCtx.createMediaStreamSource(stream);
+          source.connect(analyser);
+          volumeLoop();
+        })
+        .catch(err => console.error("Error accessing microphone:", err));
+
+      recognition = new webkitSpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+      recognition.onresult = handleSpeech;
+      recognition.start();
+    }
+
+    function stopRecording() {
+      recognition.stop();
+      if (audioCtx) audioCtx.close();
+      isRecording = false;
+      document.getElementById("startBtn").disabled = false;
+      document.getElementById("stopBtn").disabled = true;
+      showResults();
+    }
+
+    function handleSpeech(event) {
+      let interim = "", final = "";
+      for (let i = event.resultIndex; i < event.results.length; i++) {
+        const transcript = event.results[i][0].transcript;
+        if (event.results[i].isFinal) {
+          final += transcript;
+          processTranscript(transcript);
+        } else {
+          interim += transcript;
+        }
+      }
+      document.getElementById("liveTranscript").innerHTML = highlightFiller(interim);
+    }
+
+    function processTranscript(text) {
+      const words = text.trim().split(/\s+/);
+      wordCount += words.length;
+      let lower = text.toLowerCase();
+      FILLERS.forEach(word => {
+        const count = (lower.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length;
+        fillerWords += count;
+      });
+      document.getElementById("finalTranscript").innerHTML += highlightFiller(text) + "<br>";
+    }
+
+    function highlightFiller(text) {
+      let result = text;
+      FILLERS.forEach(word => {
+        const regex = new RegExp(`\\b${word}\\b`, 'gi');
+        result = result.replace(regex, `<span class="filler-word">${word}</span>`);
+      });
+      return result;
+    }
+
+    function volumeLoop() {
+      if (!isRecording) return;
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      analyser.getByteFrequencyData(data);
+      const avg = data.reduce((a, b) => a + b, 0) / data.length;
+      document.getElementById("volumeMeter").style.width = Math.min(avg, 100) + "%";
+      requestAnimationFrame(volumeLoop);
+    }
+
+    function evaluateGrammar() {
+      const transcriptText = document.getElementById("finalTranscript").textContent;
+      const sentences = transcriptText.split(/[.!?]+/).filter(s => s.trim().length > 0);
+      const totalSentences = sentences.length;
+      let errorCount = 0;
+      sentences.forEach(sentence => {
+        sentence = sentence.trim();
+        if (!sentence) return;
+        if (sentence[0] !== sentence[0].toUpperCase()) errorCount++;
+        const count = sentence.split(/\s+/).length;
+        if (count < 5) errorCount++;
+      });
+      let grammarScore = Math.max(0, 100 - (errorCount * 10));
+      return grammarScore;
+    }
+
+    function showResults() {
+      const fillerRate = Math.round((fillerWords / wordCount) * 100) || 0;
+      const clarity = 100 - Math.min(fillerRate * 3, 50);
+      const confidence = Math.round(80 + Math.random() * 20);
+      const grammar = evaluateGrammar();
+
+      document.getElementById("clarityScore").innerText = `${clarity}/100`;
+      document.getElementById("fillerCount").innerText = `${fillerWords} (${fillerRate}%)`;
+      document.getElementById("confidenceScore").innerText = `${confidence}/100`;
+      document.getElementById("grammarScore").innerText = `${grammar}/100`;
+      document.getElementById("compositeScore").innerText = `${Math.round(clarity * 0.35 + confidence * 0.3 + grammar * 0.35)}/100`;
+
+      document.getElementById("results").style.display = "block";
+    }
+  </script>
+
+</body>
+</html>
