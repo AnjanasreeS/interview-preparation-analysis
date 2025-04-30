@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -11,8 +12,10 @@
       color: #333;
       max-width: 1000px;
       margin: 0 auto;
-      padding: 20px;
+      padding: 100px;
       background-color: #f5f5f5;
+      align-items: center;
+      justify-content: center;
     }
 
     .section {
@@ -77,12 +80,15 @@
 
     .visualization {
       width: 100%;
-      height: 200px;
+      height: 600px;
       background: #f0f0f0;
-      border-radius: 8px;
-      margin-top: 10px;
+      border-radius: 10px;
+      margin-top: 50px;
       position: relative;
       overflow: hidden;
+      justify-content: center;
+      align-items: center;
+      align-content:center;
     }
 
     .face-overlay {
@@ -214,12 +220,31 @@
     }
     .visualization {
         width: 100%;
-        height: 400px; /* Adjust height as needed */
+        height: 600px; /* Adjust height as needed */
         background: #f0f0f0;
         border-radius: 8px;
         margin-top: 10px;
         position: relative;
         overflow: hidden;
+    }
+    
+    /* Success message style */
+    .success-message {
+      padding: 15px;
+      background-color: #d4edda;
+      color: #155724;
+      border-radius: 4px;
+      margin: 15px 0;
+      display: none;
+    }
+    
+    /* Back button style */
+    .back-button {
+      background-color: #6c757d;
+      margin-top: 15px;
+    }
+    .back-button:hover {
+      background-color: #5a6268;
     }
   </style>
 </head>
@@ -234,6 +259,11 @@
     <div id="loadingIndicator" class="loading" style="display: none;">
       <div class="spinner"></div>
       <span>Initializing analysis system...</span>
+    </div>
+
+    <!-- Success message that will show after analysis -->
+    <div id="successMessage" class="success-message">
+      <strong>Analysis complete!</strong> Your gesture score has been saved to your performance dashboard.
     </div>
 
     <div id="realtimeFeedback" style="display: none; margin-top: 15px;">
@@ -293,359 +323,445 @@
       </div>
       <div class="tips" id="improvementTips"></div>
     </div>
+    <button class="back-button" onclick="window.location.href='index.html'">Go Back to Dashboard</button>
   </div>
 
   <script>
     // Analysis System Constants
-const ANALYSIS_DURATION = 30000; // 30 seconds
-const UPDATE_INTERVAL = 500; // Update every 500ms
-const HAND_MOVEMENT_COOLDOWN = 1000; // 1 second between hand movements
+    const ANALYSIS_DURATION = 30000; // 30 seconds
+    const UPDATE_INTERVAL = 500; // Update every 500ms
+    const HAND_MOVEMENT_COOLDOWN = 1000; // 1 second between hand movements
 
-// Analysis State
-let analysisInterval;
-let analysisStartTime;
-let animationFrame;
-let canvas, ctx;
-let videoElement;
-let stream = null;
+    // Analysis State
+    let analysisInterval;
+    let analysisStartTime;
+    let animationFrame;
+    let canvas, ctx;
+    let videoElement;
+    let stream = null;
 
-// Analysis Data
-const analysisData = {
-  eyeContact: { good: 0, total: 0, timeline: [] },
-  handMovements: { count: 0, timeline: [] },
-  posture: { good: 0, total: 0, timeline: [] },
-  expressions: { positive: 0, total: 0, timeline: [] }
-};
+    // Analysis Data
+    const analysisData = {
+      eyeContact: { good: 0, total: 0, timeline: [] },
+      handMovements: { count: 0, timeline: [] },
+      posture: { good: 0, total: 0, timeline: [] },
+      expressions: { positive: 0, total: 0, timeline: [] }
+    };
 
-// DOM Elements
-const startBtn = document.getElementById('startBtn');
-const stopBtn = document.getElementById('stopBtn');
-const loadingIndicator = document.getElementById('loadingIndicator');
-const realtimeFeedback = document.getElementById('realtimeFeedback');
-const resultsSection = document.getElementById('resultsSection');
-const progressBar = document.getElementById('analysisProgress');
-const liveFeedback = document.getElementById('liveFeedback');
+    // DOM Elements
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const loadingIndicator = document.getElementById('loadingIndicator');
+    const realtimeFeedback = document.getElementById('realtimeFeedback');
+    const resultsSection = document.getElementById('resultsSection');
+    const progressBar = document.getElementById('analysisProgress');
+    const liveFeedback = document.getElementById('liveFeedback');
+    const successMessage = document.getElementById('successMessage');
 
-// Initialize the system
-document.addEventListener('DOMContentLoaded', function() {
-  // Set up canvas and video
-  canvas = document.getElementById('analysisCanvas');
-  ctx = canvas.getContext('2d');
-  videoElement = document.getElementById('cameraFeed');
+    // Initialize the system
+    document.addEventListener('DOMContentLoaded', function() {
+      // Set up canvas and video
+      canvas = document.getElementById('analysisCanvas');
+      ctx = canvas.getContext('2d');
+      videoElement = document.getElementById('cameraFeed');
 
-  // Set canvas size to match container
-  const container = document.getElementById('visualizationContainer');
-  if (container) {
-    canvas.width = container.offsetWidth;
-    canvas.height = container.offsetHeight;
-  }
+      // Set canvas size to match container
+      const container = document.getElementById('visualizationContainer');
+      if (container) {
+        canvas.width = container.offsetWidth;
+        canvas.height = container.offsetHeight;
+      }
 
-  // Event listeners
-  startBtn.addEventListener('click', startAnalysis);
-  stopBtn.addEventListener('click', stopAnalysis);
-});
-
-// Start the analysis
-async function startAnalysis() {
-  // Reset state
-  resetAnalysisData();
-  updateUIForStart();
-
-  // Show loading indicator
-  loadingIndicator.style.display = 'flex';
-
-  // Try to start camera
-  const cameraStarted = await startCamera();
-
-  // Simulate model loading (in a real app, this would be actual model loading)
-  setTimeout(() => {
-    loadingIndicator.style.display = 'none';
-    realtimeFeedback.style.display = 'block';
-
-    // Start analysis timer
-    analysisStartTime = Date.now();
-    updateProgressBar(ANALYSIS_DURATION);
-
-    // Start analysis loop
-    analysisInterval = setInterval(analyzeGestures, UPDATE_INTERVAL);
-      // Inside startAnalysis() function, after video starts
-    const container = document.getElementById('visualizationContainer');
-    canvas.width = container.offsetWidth;
-    canvas.height = container.offsetHeight;
-
-// Optionally, update video size if needed
-    videoElement.style.width = "100%";  // You can use specific values like '800px' or '100%' for width
-    videoElement.style.height = "400px";  // You can set a specific height, such as 400px
-
-
-    // Start visualization animation
-    animateVisualization();
-  }, 1500);
-}
-
-// Stop the analysis
-function stopAnalysis() {
-  clearInterval(analysisInterval);
-  cancelAnimationFrame(animationFrame);
-  stopCamera();
-
-  // Update UI
-  stopBtn.disabled = true;
-  startBtn.disabled = false;
-  progressBar.style.width = '0%';
-
-  // Calculate and display final results
-  calculateFinalScores();
-  resultsSection.style.display = 'block';
-}
-
-// Start camera
-async function startCamera() {
-  try {
-    stream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        width: { ideal: 800 },
-        height: { ideal: 600 },
-        facingMode: 'user'
-      },
-      audio: false
+      // Event listeners
+      startBtn.addEventListener('click', startAnalysis);
+      stopBtn.addEventListener('click', stopAnalysis);
     });
-    videoElement.srcObject = stream;
-    videoElement.style.display = 'block';
-    return true;
-  } catch (err) {
-    console.error('Error accessing camera:', err);
-    showCameraError();
-    return false;
-  }
-}
 
-// Stop camera
-function stopCamera() {
-  if (stream) {
-    stream.getTracks().forEach(track => track.stop());
-    videoElement.srcObject = null;
-    videoElement.style.display = 'none';
-  }
-}
+    // Start the analysis
+    async function startAnalysis() {
+      // Reset state
+      resetAnalysisData();
+      updateUIForStart();
 
-// Show camera error
-function showCameraError() {
-  const alertDiv = document.createElement('div');
-  alertDiv.className = 'alert';
-  alertDiv.textContent = 'Could not access camera. Using simulated data instead.';
-  document.querySelector('.section').prepend(alertDiv);
-}
+      // Show loading indicator
+      loadingIndicator.style.display = 'flex';
 
-// Reset analysis data
-function resetAnalysisData() {
-  analysisData.eyeContact = { good: 0, total: 0, timeline: [] };
-  analysisData.handMovements = { count: 0, timeline: [] };
-  analysisData.posture = { good: 0, total: 0, timeline: [] };
-  analysisData.expressions = { positive: 0, total: 0, timeline: [] };
-}
+      // Try to start camera
+      const cameraStarted = await startCamera();
 
-// Update UI for analysis start
-function updateUIForStart() {
-  startBtn.disabled = true;
-  stopBtn.disabled = false;
-  realtimeFeedback.style.display = 'none';
-  resultsSection.style.display = 'none';
+      // Simulate model loading (in a real app, this would be actual model loading)
+      setTimeout(() => {
+        loadingIndicator.style.display = 'none';
+        realtimeFeedback.style.display = 'block';
 
-  // Reset live values
-  document.getElementById('eyeContactLiveValue').textContent = '0%';
-  document.getElementById('handMovementLiveValue').textContent = '0';
-  document.getElementById('postureLiveValue').textContent = '0%';
-  document.getElementById('expressionLiveValue').textContent = '0%';
+        // Start analysis timer
+        analysisStartTime = Date.now();
+        updateProgressBar(ANALYSIS_DURATION);
 
-  // Reset indicators
-  updateIndicator('eyeContactLiveIndicator', 0);
-  updateIndicator('handMovementLiveIndicator', 0);
-  updateIndicator('postureLiveIndicator', 0);
-  updateIndicator('expressionLiveIndicator', 0);
-}
+        // Start analysis loop
+        analysisInterval = setInterval(analyzeGestures, UPDATE_INTERVAL);
+        // Inside startAnalysis() function, after video starts
+        const container = document.getElementById('visualizationContainer');
+        canvas.width = container.offsetWidth;
+        canvas.height = container.offsetHeight;
 
-// Update progress bar
-function updateProgressBar(duration) {
-  const startTime = Date.now();
-  const endTime = startTime + duration;
+        // Optionally, update video size if needed
+        videoElement.style.width = "100%";
+        videoElement.style.height = "400px";
 
-  function update() {
-    const now = Date.now();
-    const elapsed = now - startTime;
-    const progress = Math.min((elapsed / duration) * 100, 100);
-    progressBar.style.width = `${progress}%`;
-
-    if (now < endTime) {
-      requestAnimationFrame(update);
-    } else {
-      stopAnalysis();
+        // Start visualization animation
+        animateVisualization();
+      }, 1500);
     }
-  }
 
-  update();
-}
+    // Stop the analysis
+    function stopAnalysis() {
+      clearInterval(analysisInterval);
+      cancelAnimationFrame(animationFrame);
+      stopCamera();
 
-// Main analysis function
-function analyzeGestures() {
-  const elapsedTime = Date.now() - analysisStartTime;
+      // Update UI
+      stopBtn.disabled = true;
+      startBtn.disabled = false;
+      progressBar.style.width = '0%';
 
-  // Simulate face detection (90% chance)
-  const faceDetected = Math.random() > 0.1;
-
-  if (faceDetected) {
-    // Analyze eye contact (60-90% chance of good eye contact)
-    const eyeContactGood = Math.random() > 0.3 ? 1 : 0;
-    analysisData.eyeContact.total++;
-    analysisData.eyeContact.good += eyeContactGood;
-    analysisData.eyeContact.timeline.push({
-      time: elapsedTime,
-      value: eyeContactGood
-    });
-
-    // Analyze posture (50-85% chance of good posture)
-    const postureGood = Math.random() > 0.4 ? 1 : 0;
-    analysisData.posture.total++;
-    analysisData.posture.good += postureGood;
-    analysisData.posture.timeline.push({
-      time: elapsedTime,
-      value: postureGood
-    });
-
-    // Analyze expressions (40-80% chance of positive expression)
-    const expressionPositive = Math.random() > 0.5 ? 1 : 0;
-    analysisData.expressions.total++;
-    analysisData.expressions.positive += expressionPositive;
-    analysisData.expressions.timeline.push({
-      time: elapsedTime,
-      value: expressionPositive
-    });
-
-    // Analyze hand movements (occasional with cooldown)
-    const lastMovementTime = analysisData.handMovements.timeline.length > 0
-      ? analysisData.handMovements.timeline[analysisData.handMovements.timeline.length - 1].time
-      : 0;
-
-    if (Math.random() > 0.8 && (elapsedTime - lastMovementTime) > HAND_MOVEMENT_COOLDOWN) {
-      analysisData.handMovements.count++;
-      analysisData.handMovements.timeline.push({
-        time: elapsedTime,
-        value: 1
-      });
+      // Calculate and display final results
+      calculateFinalScores();
+      resultsSection.style.display = 'block';
+      
+      // Show success message
+      successMessage.style.display = 'block';
     }
-  } else {
-    // No face detected - count as negative for metrics
-    analysisData.eyeContact.total++;
-    analysisData.eyeContact.timeline.push({ time: elapsedTime, value: 0 });
 
-    analysisData.posture.total++;
-    analysisData.posture.timeline.push({ time: elapsedTime, value: 0 });
+    // Start camera
+    async function startCamera() {
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            width: { ideal: 800 },
+            height: { ideal: 600 },
+            facingMode: 'user'
+          },
+          audio: false
+        });
+        videoElement.srcObject = stream;
+        videoElement.style.display = 'block';
+        return true;
+      } catch (err) {
+        console.error('Error accessing camera:', err);
+        showCameraError();
+        return false;
+      }
+    }
 
-    analysisData.expressions.total++;
-    analysisData.expressions.timeline.push({ time: elapsedTime, value: 0 });
-  }
+    // Stop camera
+    function stopCamera() {
+      if (stream) {
+        stream.getTracks().forEach(track => track.stop());
+        videoElement.srcObject = null;
+        videoElement.style.display = 'none';
+      }
+    }
 
-  // Update live feedback
-  updateLiveFeedback();
-}
+    // Show camera error
+    function showCameraError() {
+      const alertDiv = document.createElement('div');
+      alertDiv.className = 'alert';
+      alertDiv.textContent = 'Could not access camera. Using simulated data instead.';
+      document.querySelector('.section').prepend(alertDiv);
+    }
 
-// Update live feedback display
-function updateLiveFeedback() {
-  // Calculate current metrics
-  const eyeContactPercent = analysisData.eyeContact.total > 0
-    ? Math.round((analysisData.eyeContact.good / analysisData.eyeContact.total) * 100)
-    : 0;
+    // Reset analysis data
+    function resetAnalysisData() {
+      analysisData.eyeContact = { good: 0, total: 0, timeline: [] };
+      analysisData.handMovements = { count: 0, timeline: [] };
+      analysisData.posture = { good: 0, total: 0, timeline: [] };
+      analysisData.expressions = { positive: 0, total: 0, timeline: [] };
+    }
 
-  const handMovementScore = calculateHandMovementScore(analysisData.handMovements.count);
+    // Update UI for analysis start
+    function updateUIForStart() {
+      startBtn.disabled = true;
+      stopBtn.disabled = false;
+      realtimeFeedback.style.display = 'none';
+      resultsSection.style.display = 'none';
+      successMessage.style.display = 'none';
 
-  const posturePercent = analysisData.posture.total > 0
-    ? Math.round((analysisData.posture.good / analysisData.posture.total) * 100)
-    : 0;
+      // Reset live values
+      document.getElementById('eyeContactLiveValue').textContent = '0%';
+      document.getElementById('handMovementLiveValue').textContent = '0';
+      document.getElementById('postureLiveValue').textContent = '0%';
+      document.getElementById('expressionLiveValue').textContent = '0%';
 
-  const expressionPercent = analysisData.expressions.total > 0
-    ? Math.round((analysisData.expressions.positive / analysisData.expressions.total) * 100)
-    : 0;
+      // Reset indicators
+      updateIndicator('eyeContactLiveIndicator', 0);
+      updateIndicator('handMovementLiveIndicator', 0);
+      updateIndicator('postureLiveIndicator', 0);
+      updateIndicator('expressionLiveIndicator', 0);
+    }
 
-  // Update displayed values
-  document.getElementById('eyeContactLiveValue').textContent = `${eyeContactPercent}%`;
-  document.getElementById('handMovementLiveValue').textContent = analysisData.handMovements.count;
-  document.getElementById('postureLiveValue').textContent = `${posturePercent}%`;
-  document.getElementById('expressionLiveValue').textContent = `${expressionPercent}%`;
+    // Update progress bar
+    function updateProgressBar(duration) {
+      const startTime = Date.now();
+      const endTime = startTime + duration;
 
-  // Update score colors
-  updateScoreColor('eyeContactLiveValue', eyeContactPercent);
-  updateScoreColor('handMovementLiveValue', handMovementScore);
-  updateScoreColor('postureLiveValue', posturePercent);
-  updateScoreColor('expressionLiveValue', expressionPercent);
+      function update() {
+        const now = Date.now();
+        const elapsed = now - startTime;
+        const progress = Math.min((elapsed / duration) * 100, 100);
+        progressBar.style.width = `${progress}%`;
 
-  // Update indicators
-  updateIndicator('eyeContactLiveIndicator', eyeContactPercent);
-  updateIndicator('handMovementLiveIndicator', handMovementScore);
-  updateIndicator('postureLiveIndicator', posturePercent);
-  updateIndicator('expressionLiveIndicator', expressionPercent);
-}
+        if (now < endTime) {
+          requestAnimationFrame(update);
+        } else {
+          stopAnalysis();
+        }
+      }
 
-// Update score color
-function updateScoreColor(elementId, value) {
-  const element = document.getElementById(elementId);
-  if (value >= 80) {
-    element.style.color = 'green';
-  } else if (value >= 50) {
-    element.style.color = 'orange';
-  } else {
-    element.style.color = 'red';
-  }
-}
+      update();
+    }
 
-// Update indicator color
-function updateIndicator(elementId, value) {
-  const indicator = document.getElementById(elementId);
-  if (value >= 80) {
-    indicator.style.backgroundColor = 'green';
-  } else if (value >= 50) {
-    indicator.style.backgroundColor = 'orange';
-  } else {
-    indicator.style.backgroundColor = 'red';
-  }
-}
+    // Main analysis function
+    function analyzeGestures() {
+      const elapsedTime = Date.now() - analysisStartTime;
 
-// Calculate hand movement score
-function calculateHandMovementScore(count) {
-  return Math.min(count * 10, 100);
-}
+      // Simulate face detection (90% chance)
+      const faceDetected = Math.random() > 0.1;
 
-// Animation loop for visualization
-function animateVisualization() {
-  animationFrame = requestAnimationFrame(animateVisualization);
+      if (faceDetected) {
+        // Analyze eye contact (60-90% chance of good eye contact)
+        const eyeContactGood = Math.random() > 0.3 ? 1 : 0;
+        analysisData.eyeContact.total++;
+        analysisData.eyeContact.good += eyeContactGood;
+        analysisData.eyeContact.timeline.push({
+          time: elapsedTime,
+          value: eyeContactGood
+        });
 
-  // Clear canvas
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+        // Analyze posture (50-85% chance of good posture)
+        const postureGood = Math.random() > 0.4 ? 1 : 0;
+        analysisData.posture.total++;
+        analysisData.posture.good += postureGood;
+        analysisData.posture.timeline.push({
+          time: elapsedTime,
+          value: postureGood
+        });
 
-  // Update visual feedback (e.g., eye contact, posture, expression visualization)
-  // Example: Draw a progress circle based on the analysis data
-  const progress = analysisData.eyeContact.total > 0
-    ? analysisData.eyeContact.good / analysisData.eyeContact.total
-    : 0;
-  ctx.beginPath();
-  ctx.arc(canvas.width / 2, canvas.height / 2, 100, 0, 2 * Math.PI * progress);
-  ctx.strokeStyle = '#4CAF50';
-  ctx.lineWidth = 5;
-  ctx.stroke();
-}
+        // Analyze expressions (40-80% chance of positive expression)
+        const expressionPositive = Math.random() > 0.5 ? 1 : 0;
+        analysisData.expressions.total++;
+        analysisData.expressions.positive += expressionPositive;
+        analysisData.expressions.timeline.push({
+          time: elapsedTime,
+          value: expressionPositive
+        });
 
-// Calculate final scores and show results
-function calculateFinalScores() {
-  const eyeContactScore = Math.round((analysisData.eyeContact.good / analysisData.eyeContact.total) * 100);
-  const postureScore = Math.round((analysisData.posture.good / analysisData.posture.total) * 100);
-  const expressionScore = Math.round((analysisData.expressions.positive / analysisData.expressions.total) * 100);
-  const handMovementScore = calculateHandMovementScore(analysisData.handMovements.count);
+        // Analyze hand movements (occasional with cooldown)
+        const lastMovementTime = analysisData.handMovements.timeline.length > 0
+          ? analysisData.handMovements.timeline[analysisData.handMovements.timeline.length - 1].time
+          : 0;
 
-  document.getElementById('finalEyeContact').textContent = `${eyeContactScore}%`;
-  document.getElementById('finalPosture').textContent = `${postureScore}%`;
-  document.getElementById('finalExpression').textContent = `${expressionScore}%`;
-  document.getElementById('finalHandMovements').textContent = handMovementScore;
-}
+        if (Math.random() > 0.8 && (elapsedTime - lastMovementTime) > HAND_MOVEMENT_COOLDOWN) {
+          analysisData.handMovements.count++;
+          analysisData.handMovements.timeline.push({
+            time: elapsedTime,
+            value: 1
+          });
+        }
+      } else {
+        // No face detected - count as negative for metrics
+        analysisData.eyeContact.total++;
+        analysisData.eyeContact.timeline.push({ time: elapsedTime, value: 0 });
 
+        analysisData.posture.total++;
+        analysisData.posture.timeline.push({ time: elapsedTime, value: 0 });
+
+        analysisData.expressions.total++;
+        analysisData.expressions.timeline.push({ time: elapsedTime, value: 0 });
+      }
+
+      // Update live feedback
+      updateLiveFeedback();
+    }
+
+    // Update live feedback display
+    function updateLiveFeedback() {
+      // Calculate current metrics
+      const eyeContactPercent = analysisData.eyeContact.total > 0
+        ? Math.round((analysisData.eyeContact.good / analysisData.eyeContact.total) * 100)
+        : 0;
+
+      const handMovementScore = calculateHandMovementScore(analysisData.handMovements.count);
+
+      const posturePercent = analysisData.posture.total > 0
+        ? Math.round((analysisData.posture.good / analysisData.posture.total) * 100)
+        : 0;
+
+      const expressionPercent = analysisData.expressions.total > 0
+        ? Math.round((analysisData.expressions.positive / analysisData.expressions.total) * 100)
+        : 0;
+
+      // Update displayed values
+      document.getElementById('eyeContactLiveValue').textContent = `${eyeContactPercent}%`;
+      document.getElementById('handMovementLiveValue').textContent = analysisData.handMovements.count;
+      document.getElementById('postureLiveValue').textContent = `${posturePercent}%`;
+      document.getElementById('expressionLiveValue').textContent = `${expressionPercent}%`;
+
+      // Update score colors
+      updateScoreColor('eyeContactLiveValue', eyeContactPercent);
+      updateScoreColor('handMovementLiveValue', handMovementScore);
+      updateScoreColor('postureLiveValue', posturePercent);
+      updateScoreColor('expressionLiveValue', expressionPercent);
+
+      // Update indicators
+      updateIndicator('eyeContactLiveIndicator', eyeContactPercent);
+      updateIndicator('handMovementLiveIndicator', handMovementScore);
+      updateIndicator('postureLiveIndicator', posturePercent);
+      updateIndicator('expressionLiveIndicator', expressionPercent);
+    }
+
+    // Update score color
+    function updateScoreColor(elementId, value) {
+      const element = document.getElementById(elementId);
+      if (value >= 80) {
+        element.className = 'metric-value good';
+      } else if (value >= 50) {
+        element.className = 'metric-value average';
+      } else {
+        element.className = 'metric-value poor';
+      }
+    }
+
+    // Update indicator color
+    function updateIndicator(elementId, value) {
+      const indicator = document.getElementById(elementId);
+      if (value >= 80) {
+        indicator.style.backgroundColor = '#28a745'; // green
+      } else if (value >= 50) {
+        indicator.style.backgroundColor = '#ffc107'; // yellow
+      } else {
+        indicator.style.backgroundColor = '#dc3545'; // red
+      }
+    }
+
+    // Calculate hand movement score
+    function calculateHandMovementScore(count) {
+      return Math.min(count * 10, 100);
+    }
+
+    // Animation loop for visualization
+    function animateVisualization() {
+      animationFrame = requestAnimationFrame(animateVisualization);
+
+      // Clear canvas
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Update visual feedback (e.g., eye contact, posture, expression visualization)
+      // Example: Draw a progress circle based on the analysis data
+      const progress = analysisData.eyeContact.total > 0
+        ? analysisData.eyeContact.good / analysisData.eyeContact.total
+        : 0;
+      ctx.beginPath();
+      ctx.arc(canvas.width / 2, canvas.height / 2, 100, 0, 2 * Math.PI * progress);
+      ctx.strokeStyle = '#4CAF50';
+      ctx.lineWidth = 5;
+      ctx.stroke();
+    }
+
+    // Calculate final scores and show results
+    function calculateFinalScores() {
+      const eyeContactScore = analysisData.eyeContact.total > 0 
+        ? Math.round((analysisData.eyeContact.good / analysisData.eyeContact.total) * 100)
+        : 0;
+      const postureScore = analysisData.posture.total > 0
+        ? Math.round((analysisData.posture.good / analysisData.posture.total) * 100)
+        : 0;
+      const expressionScore = analysisData.expressions.total > 0
+        ? Math.round((analysisData.expressions.positive / analysisData.expressions.total) * 100)
+        : 0;
+      const handMovementScore = calculateHandMovementScore(analysisData.handMovements.count);
+
+      // Calculate overall gesture score (weighted average)
+      const overallGestureScore = Math.round(
+        (eyeContactScore * 0.3) + 
+        (postureScore * 0.3) + 
+        (expressionScore * 0.2) + 
+        (handMovementScore * 0.2)
+      );
+
+      // Update final results display
+      document.getElementById('eyeContactFinalValue').textContent = `${eyeContactScore}%`;
+      document.getElementById('postureFinalValue').textContent = `${postureScore}%`;
+      document.getElementById('expressionFinalValue').textContent = `${expressionScore}%`;
+      document.getElementById('handMovementFinalValue').textContent = handMovementScore;
+
+      // Update score colors for final results
+      updateScoreColor('eyeContactFinalValue', eyeContactScore);
+      updateScoreColor('postureFinalValue', postureScore);
+      updateScoreColor('expressionFinalValue', expressionScore);
+      updateScoreColor('handMovementFinalValue', handMovementScore);
+
+      // Update indicators for final results
+      updateIndicator('eyeContactFinalIndicator', eyeContactScore);
+      updateIndicator('postureFinalIndicator', postureScore);
+      updateIndicator('expressionFinalIndicator', expressionScore);
+      updateIndicator('handMovementFinalIndicator', handMovementScore);
+
+      // Generate improvement tips
+      generateImprovementTips(eyeContactScore, postureScore, expressionScore, handMovementScore);
+
+      // Save the score to sessionStorage for the main page
+      saveGestureScore(overallGestureScore);
+    }
+
+    // Generate personalized improvement tips
+    function generateImprovementTips(eyeContact, posture, expression, handMovements) {
+      const tipsContainer = document.getElementById('improvementTips');
+      let tipsHTML = '<h3>Personalized Improvement Tips</h3><ul>';
+
+      if (eyeContact < 70) {
+        tipsHTML += '<li><strong>Eye Contact:</strong> Practice maintaining eye contact with the camera. Try placing a small sticker near your webcam to remind yourself to look at it.</li>';
+      }
+
+      if (posture < 70) {
+        tipsHTML += '<li><strong>Posture:</strong> Sit up straight with your shoulders back. Imagine a string pulling you up from the top of your head.</li>';
+      }
+
+      if (expression < 70) {
+        tipsHTML += '<li><strong>Facial Expressions:</strong> Smile naturally and nod occasionally to show engagement. Practice in front of a mirror.</li>';
+      }
+
+      if (handMovements < 50) {
+        tipsHTML += '<li><strong>Hand Movements:</strong> Use natural hand gestures to emphasize points, but avoid excessive movement that might be distracting.</li>';
+      } else if (handMovements > 80) {
+        tipsHTML += '<li><strong>Hand Movements:</strong> Your gestures are active, which is good, but make sure they\'re purposeful and not distracting.</li>';
+      }
+
+      if (eyeContact >= 80 && posture >= 80 && expression >= 80) {
+        tipsHTML += '<li>Your body language is strong! Focus on maintaining this level of engagement throughout your interviews.</li>';
+      }
+
+      tipsHTML += '</ul>';
+      tipsContainer.innerHTML = tipsHTML;
+    }
+
+    // Save gesture score to sessionStorage
+    function saveGestureScore(score) {
+      try {
+        // Get existing scores or create new object if none exists
+        const currentScores = JSON.parse(sessionStorage.getItem('interviewScores')) || {};
+        
+        // Update the gestures score
+        currentScores.gestures = score;
+        
+        // Save back to sessionStorage
+        sessionStorage.setItem('interviewScores', JSON.stringify(currentScores));
+        
+        console.log('Gesture score saved:', score);
+      } catch (error) {
+        console.error('Error saving gesture score:', error);
+      }
+    }
   </script>
 </body>
 </html>
