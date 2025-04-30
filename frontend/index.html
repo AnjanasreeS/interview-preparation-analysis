@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -7,41 +8,42 @@
   <style>
     body {
       font-family: 'Segoe UI', sans-serif;
-      background: #f0f4f8;
       margin: 0;
+      background: #ddd;
       padding: 30px 15px;
       text-align: center;
     }
+
     h1 {
       font-size: 2.5rem;
       margin-bottom: 10px;
-      color: #333;
+      color:black;
     }
     .running-text {
       font-size: 1.2rem;
-      color: #007bff;
+      color:#5a6268;
       margin-bottom: 20px;
       /* Animation can be distracting, consider removing or adjusting if needed */
-      /* animation: scroll 10s linear infinite; */
+      animation: scroll 10s linear infinite; 
       white-space: nowrap;
       overflow: hidden;
       box-sizing: border-box;
       padding: 5px; /* Added padding for visibility */
       border: 1px solid #eee; /* Added border for visibility */
-      background: #e9f5ff;
+      background:#eee;
     }
-    /* @keyframes scroll {
+     @keyframes scroll {
       0% { transform: translateX(100%); }
       100% { transform: translateX(-100%); }
-    } */
+    } 
     .card {
-      background: white;
+      background:#eee;
       border-radius: 12px;
       padding: 20px;
       width: 200px;
       cursor: pointer;
       box-shadow: 0 6px 10px rgba(0,0,0,0.1);
-      transition: transform 0.2s, box-shadow 0.3s, border-color 0.3s;
+      transition: transform 0.2s, box-shadow 0.5s, border-color 0.5s;
       border: 2px solid transparent;
       display: inline-block; /* Align cards */
       vertical-align: top; /* Align cards */
@@ -55,20 +57,27 @@
     }
     .section {
       font-size: larger;
-      background: #fff;
+      background:#eee;
       padding: 20px;
       margin: 20px auto;
       max-width: 800px;
       border-radius: 10px;
       box-shadow: 0 4px 12px rgba(0,0,0,0.1);
       text-align: left;
+      /* background-image: url('https://www.google.com/url?sa=i&url=https%3A%2F%2Fstock.adobe.com%2Fsearch%3Fk%3Dwebsite%2Bbackground&psig=AOvVaw0fXXlH9DkEgIbzgRQMtpaO&ust=1746108969464000&source=images&cd=vfe&opi=89978449&ved=0CBQQjRxqFwoTCOCkxPr4_4wDFQAAAAAdAAAAABAE');
+      
+      background-size: cover;        
+      background-position: center;    
+      background-repeat: no-repeat;  
+      height: 100vh;   */   
+      
     }
     textarea {
       width: calc(100% - 22px); /* Adjust width for padding/border */
       padding: 10px;
       margin-top: 10px;
       border-radius: 6px;
-      border: 1px solid #ccc;
+      border: 1px solid white;
       min-height: 100px;
       resize: vertical;
       box-sizing: border-box;
