@@ -1,201 +1,426 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>Interview Speech Analysis</title>
-  <style>
-    body {
-      font-family: Arial, sans-serif;
-      padding: 20px;
-    }
-    .speech-meter {
-      height: 20px;
-      background: #f0f0f0;
-      border-radius: 10px;
-      margin: 10px 0;
-      overflow: hidden;
-    }
-    .meter-fill {
-      height: 100%;
-      width: 0%;
-      background: linear-gradient(to right, #ff4d4d, #ffcc00, #28a745);
-      transition: width 0.3s;
-    }
-    .transcript-container {
-      max-height: 150px;
-      overflow-y: auto;
-      border: 1px solid #ddd;
-      padding: 10px;
-      margin: 10px 0;
-      border-radius: 5px;
-      background: #f9f9f9;
-    }
-    .filler-word {
-      background-color: #fff3cd;
-      padding: 0 2px;
-      border-radius: 3px;
-    }
-    .analysis-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-      gap: 15px;
-      margin-top: 15px;
-    }
-    .analysis-card {
-      background: #f8f9fa;
-      padding: 12px;
-      border-radius: 8px;
-      border-left: 4px solid #007bff;
-    }
-    .composite {
-      font-weight: bold;
-      margin-top: 10px;
-    }
-  </style>
-</head>
-<body>
 
-  <h2>🗣 Interview Speech Analysis</h2>
-  <div class="speech-meter">
-    <div class="meter-fill" id="volumeMeter"></div>
-  </div>
-  <button onclick="startRecording()" id="startBtn">Start Recording</button>
-  <button onclick="stopRecording()" disabled id="stopBtn">Stop Recording</button>
 
-  <div id="liveTranscript" class="transcript-container" style="display:none;"></div>
-
-  <div id="results" style="display:none;">
-    <h3>Detailed Analysis</h3>
-    <div class="transcript-container" id="finalTranscript"></div>
-    <div class="analysis-grid">
-      <div class="analysis-card">Clarity Score: <span id="clarityScore">-</span></div>
-      <div class="analysis-card">Filler Words: <span id="fillerCount">-</span></div>
-      <div class="analysis-card">Confidence: <span id="confidenceScore">-</span></div>
-      <div class="analysis-card">Grammar Score: <span id="grammarScore">-</span></div>
-      <div class="analysis-card composite">Composite Score: <span id="compositeScore">-</span></div>
-    </div>
-  </div>
-
-  <script>
-    let recognition, audioCtx, analyser, source;
-    let isRecording = false;
-    let wordCount = 0, fillerWords = 0;
-    let recordingStart = null;
-    const FILLERS = ["um", "uh", "like", "you know", "so", "basically", "actually", "well"];
-
-    function startRecording() {
-      wordCount = 0;
-      fillerWords = 0;
-      document.getElementById("liveTranscript").style.display = "block";
-      document.getElementById("results").style.display = "none";
-      document.getElementById("startBtn").disabled = true;
-      document.getElementById("stopBtn").disabled = false;
-      document.getElementById("liveTranscript").innerHTML = "";
-      document.getElementById("finalTranscript").innerHTML = "";
-      recordingStart = Date.now();
-      isRecording = true;
-
-      navigator.mediaDevices.getUserMedia({ audio: true })
-        .then(stream => {
-          audioCtx = new AudioContext();
-          analyser = audioCtx.createAnalyser();
-          source = audioCtx.createMediaStreamSource(stream);
-          source.connect(analyser);
-          volumeLoop();
-        })
-        .catch(err => console.error("Error accessing microphone:", err));
-
-      recognition = new webkitSpeechRecognition();
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
-      recognition.onresult = handleSpeech;
-      recognition.start();
-    }
-
-    function stopRecording() {
-      recognition.stop();
-      if (audioCtx) audioCtx.close();
-      isRecording = false;
-      document.getElementById("startBtn").disabled = false;
-      document.getElementById("stopBtn").disabled = true;
-      showResults();
-    }
-
-    function handleSpeech(event) {
-      let interim = "", final = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
-        const transcript = event.results[i][0].transcript;
-        if (event.results[i].isFinal) {
-          final += transcript;
-          processTranscript(transcript);
-        } else {
-          interim += transcript;
-        }
+  <!DOCTYPE html>
+  <html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Interview Speech Analysis</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      body { font-family: 'Inter', sans-serif; }
+      .filler-word { background-color: #fff3cd; padding: 0 2px; border-radius: 3px; font-weight: 500; }
+      .meter-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(to right, #ef4444, #facc15, #22c55e);
+        transition: width 0.3s ease-in-out;
+        border-radius: inherit;
       }
-      document.getElementById("liveTranscript").innerHTML = highlightFiller(interim);
+      .transcript-container { max-height: 150px; overflow-y: auto; }
+      button:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      }
+      button:active {
+        transform: translateY(0px);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+      }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700&display=swap" rel="stylesheet">
+  </head>
+  <body class="bg-gray-100 p-4 md:p-8">
+  
+    <div class="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow-md">
+      <h2 class="text-2xl font-bold text-gray-800 mb-4 text-center">🗣 Interview Speech Analysis</h2>
+  
+      <div class="mb-4 text-center">
+        <button onclick="window.location.href='index.html'"
+                class="bg-gray-500 hover:bg-gray-600 text-white font-semibold py-2 px-4 rounded-md shadow">
+          ← Go Back Home
+        </button>
+      </div>
+  
+      <label for="volumeMeterContainer" class="block text-sm font-medium text-gray-600 mb-1">Volume Level:</label>
+      <div id="volumeMeterContainer" class="speech-meter h-5 bg-gray-200 rounded-full overflow-hidden mb-4 shadow-inner">
+        <div class="meter-fill" id="volumeMeter"></div>
+      </div>
+  
+      <div class="flex justify-center space-x-4 mb-4">
+        <button onclick="startRecording()" id="startBtn"
+                class="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2 px-5 rounded-md shadow">
+          Start Recording
+        </button>
+        <button onclick="stopRecording()" disabled id="stopBtn"
+                class="bg-red-500 hover:bg-red-600 text-white font-semibold py-2 px-5 rounded-md shadow disabled:opacity-50">
+          Stop Recording
+        </button>
+      </div>
+  
+      <div id="liveTranscriptSection" style="display:none;">
+        <h3 class="text-lg font-semibold text-gray-700 mt-6 mb-2">Live Transcript:</h3>
+        <div id="liveTranscript" class="transcript-container border border-gray-300 p-3 rounded-md bg-gray-50 min-h-[50px]"></div>
+      </div>
+  
+      <div id="results" style="display:none;" class="mt-6">
+        <h3 class="text-xl font-bold text-gray-800 mb-3 border-b pb-2">📊 Detailed Analysis</h3>
+        <div class="mb-4">
+          <h4 class="text-md font-semibold text-gray-700 mb-1">Final Transcript:</h4>
+          <div class="transcript-container border border-gray-300 p-3 rounded-md bg-gray-50" id="finalTranscript"></div>
+        </div>
+  
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div class="analysis-card bg-blue-50 p-4 rounded-lg border-l-4 border-blue-500 shadow-sm">
+            <div class="text-sm font-medium text-blue-800">Clarity Score</div>
+            <div class="text-2xl font-bold text-blue-900" id="clarityScore">- / 100</div>
+          </div>
+          <div class="analysis-card bg-yellow-50 p-4 rounded-lg border-l-4 border-yellow-500 shadow-sm">
+            <div class="text-sm font-medium text-yellow-800">Filler Words</div>
+            <div class="text-2xl font-bold text-yellow-900" id="fillerCount">- (0%)</div>
+          </div>
+          <div class="analysis-card bg-green-50 p-4 rounded-lg border-l-4 border-green-500 shadow-sm">
+            <div class="text-sm font-medium text-green-800">Confidence</div>
+            <div class="text-2xl font-bold text-green-900" id="confidenceScore">- / 100</div>
+          </div>
+          <div class="analysis-card bg-purple-50 p-4 rounded-lg border-l-4 border-purple-500 shadow-sm">
+            <div class="text-sm font-medium text-purple-800">Grammar Score</div>
+            <div class="text-2xl font-bold text-purple-900" id="grammarScore">- / 100</div>
+          </div>
+          <div class="analysis-card bg-indigo-50 p-4 rounded-lg border-l-4 border-indigo-500 shadow-sm sm:col-span-2 lg:col-span-1">
+            <div class="text-sm font-medium text-indigo-800">Composite Score</div>
+            <div class="text-3xl font-extrabold text-indigo-900" id="compositeScore">- / 100</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  
+    <script>
+      // ... (your existing setup and all other functions remain the same)
+      let recognition, audioCtx, analyser, source, streamReference; // Keep track of the stream
+     let isRecording = false;
+     let wordCount = 0, fillerWords = 0;
+     let finalTranscriptContent = ""; // Store the complete final transcript
+     const FILLERS = ["um", "uh", "like", "you know", "so", "basically", "actually", "well", "i mean", "right"]; // Added more fillers
+ 
+     // DOM Elements
+     const startBtn = document.getElementById('startBtn');
+     const stopBtn = document.getElementById('stopBtn');
+     const liveTranscriptDiv = document.getElementById('liveTranscript');
+     const finalTranscriptDiv = document.getElementById('finalTranscript');
+     const resultsDiv = document.getElementById('results');
+     const volumeMeter = document.getElementById('volumeMeter');
+     const liveTranscriptSection = document.getElementById('liveTranscriptSection'); // Get the section container
+ 
+     // --- Core Functions ---
+ 
+     function startRecording() {
+       // Reset state
+       wordCount = 0;
+       fillerWords = 0;
+       finalTranscriptContent = ""; // Clear previous final transcript
+       isRecording = true;
+       recordingStart = Date.now();
+ 
+       // Update UI
+       liveTranscriptSection.style.display = "block"; // Show live transcript section
+       liveTranscriptDiv.innerHTML = '<span class="text-gray-500">Listening...</span>'; // Initial message
+       finalTranscriptDiv.innerHTML = "";
+       resultsDiv.style.display = "none";
+       startBtn.disabled = true;
+       stopBtn.disabled = false;
+       volumeMeter.style.width = "0%"; // Reset volume meter
+ 
+       // --- Web Speech API Setup ---
+       const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+       if (!SpeechRecognition) {
+           alert("Sorry, your browser doesn't support the Web Speech API. Try Chrome or Edge.");
+           resetUI();
+           return;
+       }
+       recognition = new SpeechRecognition();
+       recognition.continuous = true; // Keep listening even after pauses
+       recognition.interimResults = true; // Get results as they come
+       recognition.lang = "en-US"; // Set language
+ 
+       recognition.onresult = handleSpeech;
+       recognition.onerror = handleError;
+       recognition.onend = () => {
+           // Automatically stop if recognition ends unexpectedly while recording
+           if (isRecording) {
+               console.log("Speech recognition service disconnected, stopping.");
+               stopRecording();
+           }
+       };
+ 
+       // --- Web Audio API Setup for Volume ---
+       navigator.mediaDevices.getUserMedia({ audio: true })
+         .then(stream => {
+           streamReference = stream; // Store stream reference to stop tracks later
+           audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+           analyser = audioCtx.createAnalyser();
+           analyser.fftSize = 256; // Smaller FFT size for performance
+           source = audioCtx.createMediaStreamSource(stream);
+           source.connect(analyser);
+ 
+           // Start volume visualization loop
+           volumeLoop();
+ 
+           // Start speech recognition *after* getting audio stream
+           recognition.start();
+           console.log("Recording started...");
+ 
+         })
+         .catch(err => {
+           console.error("Error accessing microphone:", err);
+           alert(`Error accessing microphone: ${err.message}. Please ensure permission is granted.`);
+           resetUI(); // Reset UI if microphone access fails
+         });
+     }
+ 
+     function stopRecording() {
+         if (!isRecording) return; // Prevent multiple stops
+         isRecording = false;
+         console.log("Stopping recording...");
+ 
+         // Stop Speech Recognition
+         if (recognition) {
+             recognition.stop();
+             recognition = null; // Clean up
+         }
+ 
+         // Stop Audio Context and Media Stream
+         if (audioCtx) {
+             audioCtx.close().catch(e => console.error("Error closing AudioContext:", e)); // Close audio context
+             audioCtx = null;
+         }
+         if (streamReference) {
+             streamReference.getTracks().forEach(track => track.stop()); // Stop microphone access
+             streamReference = null;
+         }
+ 
+ 
+         // Update UI
+         resetUI(); // Use a helper to reset common UI elements
+         showResults(); // Calculate and display analysis
+     }
+ 
+     function resetUI() {
+         startBtn.disabled = false;
+         stopBtn.disabled = true;
+         isRecording = false; // Ensure recording state is false
+         volumeMeter.style.width = "0%"; // Reset volume meter visually
+         // Optionally hide live transcript again if desired after stop
+         // liveTranscriptSection.style.display = "none";
+     }
+ 
+ 
+     // --- Event Handlers ---
+ 
+     function handleSpeech(event) {
+       let interimTranscript = "";
+       let finalTranscriptSegment = "";
+ 
+       for (let i = event.resultIndex; i < event.results.length; ++i) {
+         if (event.results[i].isFinal) {
+           finalTranscriptSegment += event.results[i][0].transcript;
+         } else {
+           interimTranscript += event.results[i][0].transcript;
+         }
+       }
+ 
+        // Update live transcript only with interim results
+       liveTranscriptDiv.innerHTML = highlightFiller(finalTranscriptContent + ' ' + interimTranscript); // Show final + interim
+       liveTranscriptDiv.scrollTop = liveTranscriptDiv.scrollHeight; // Auto-scroll
+ 
+       // Process final segments
+       if (finalTranscriptSegment) {
+           console.log("Final Segment:", finalTranscriptSegment);
+           finalTranscriptContent += finalTranscriptSegment + " "; // Append with space
+           processTranscriptSegment(finalTranscriptSegment); // Process counts for this segment
+           finalTranscriptDiv.innerHTML = highlightFiller(finalTranscriptContent); // Update final transcript display
+           finalTranscriptDiv.scrollTop = finalTranscriptDiv.scrollHeight; // Auto-scroll final
+       }
+     }
+ 
+     function handleError(event) {
+         console.error("Speech Recognition Error:", event.error);
+         let errorMessage = `Speech recognition error: ${event.error}`;
+         if (event.error === 'network') {
+             errorMessage += ". Please check your internet connection.";
+         } else if (event.error === 'no-speech') {
+             errorMessage += ". No speech detected. Ensure your microphone is working.";
+         } else if (event.error === 'audio-capture') {
+             errorMessage += ". Microphone problem. Ensure it's connected and permissions are granted.";
+         } else if (event.error === 'not-allowed') {
+             errorMessage += ". Microphone access denied. Please grant permission.";
+         }
+         alert(errorMessage);
+         if (isRecording) {
+             stopRecording(); // Stop if an error occurs during recording
+         } else {
+             resetUI(); // Reset UI if error occurs before starting
+         }
+     }
+ 
+     // --- Processing & Analysis ---
+ 
+     function processTranscriptSegment(text) {
+       // Processes only a new final segment to update counts
+       if (!text) return;
+       const words = text.trim().toLowerCase().split(/\s+/).filter(Boolean); // Filter empty strings
+       wordCount += words.length;
+ 
+       // Count fillers in this segment
+       FILLERS.forEach(filler => {
+         const regex = new RegExp(`\\b${filler}\\b`, 'g');
+         const count = (text.toLowerCase().match(regex) || []).length;
+         fillerWords += count;
+       });
+       console.log(`Segment Processed: Words=${words.length}, Total Words=${wordCount}, Total Fillers=${fillerWords}`);
+     }
+ 
+ 
+     function highlightFiller(text) {
+         let result = text;
+         FILLERS.forEach(word => {
+             // Use regex for whole word matching, case-insensitive
+             const regex = new RegExp(`\\b(${word})\\b`, 'gi');
+             // Replace found filler words with the styled span
+             result = result.replace(regex, `<span class="filler-word">$1</span>`);
+         });
+         return result;
+     }
+ 
+     function volumeLoop() {
+       // Only run if recording and audio context is active
+       if (!isRecording || !analyser) return;
+ 
+       const dataArray = new Uint8Array(analyser.frequencyBinCount);
+       analyser.getByteFrequencyData(dataArray); // Get frequency data
+ 
+       // Calculate average volume
+       let sum = 0;
+       for (let i = 0; i < dataArray.length; i++) {
+         sum += dataArray[i];
+       }
+       const average = sum / dataArray.length;
+ 
+       // Normalize and update the meter width (adjust multiplier as needed)
+       const volumePercentage = Math.min(100, Math.max(0, average * 1.5)); // Cap at 100%
+       volumeMeter.style.width = volumePercentage + "%";
+ 
+       // Request the next frame for continuous animation
+       requestAnimationFrame(volumeLoop);
+     }
+ 
+     function evaluateGrammar() {
+         // Basic placeholder grammar check - THIS IS VERY SIMPLISTIC
+         // A real grammar check requires advanced NLP libraries/APIs
+         const transcriptText = finalTranscriptContent; // Use the stored final transcript
+         if (!transcriptText.trim()) return 50; // Default score if no text
+ 
+         const sentences = transcriptText.match(/[^.!?]+[.!?]+/g) || [transcriptText]; // Basic sentence split
+         const totalSentences = sentences.length;
+         if (totalSentences === 0) return 60; // Default score if no sentences detected
+ 
+         let errorScore = 0; // Lower score is better here initially
+ 
+         sentences.forEach(sentence => {
+             sentence = sentence.trim();
+             if (!sentence) return;
+ 
+             const words = sentence.split(/\s+/);
+             const wordCount = words.length;
+ 
+             // Penalty for very short sentences (potential fragments)
+             if (wordCount < 4) {
+                 errorScore += 5;
+             }
+             // Penalty if sentence doesn't start with an uppercase letter (very basic)
+             if (sentence[0] !== sentence[0].toUpperCase()) {
+                 errorScore += 3;
+             }
+             // Penalty for excessive length (potential run-on)
+             if (wordCount > 30) {
+                 errorScore += 5;
+             }
+             // Simple check for repeated words (basic fluency indicator)
+             for (let i = 0; i < words.length - 1; i++) {
+                 if (words[i].toLowerCase() === words[i+1].toLowerCase()) {
+                     errorScore += 2;
+                 }
+             }
+         });
+ 
+         // Calculate final score (100 - penalties, capped at 0-100)
+         let grammarScore = Math.max(0, Math.min(100, 100 - errorScore));
+         console.log(`Grammar Score Calculated: ${grammarScore}`);
+         return grammarScore;
+     }
+  
+     <!-- Previous HTML remains the same until the showResults() function -->
+
+  function showResults() {
+    if (wordCount === 0) {
+      finalTranscriptDiv.innerHTML = "<span class='text-gray-500'>No speech was detected or processed.</span>";
+      resultsDiv.style.display = "block";
+      document.getElementById("clarityScore").innerText = `- / 100`;
+      document.getElementById("fillerCount").innerText = `- (0%)`;
+      document.getElementById("confidenceScore").innerText = `- / 100`;
+      document.getElementById("grammarScore").innerText = `- / 100`;
+      document.getElementById("compositeScore").innerText = `- / 100`;
+      return;
     }
 
-    function processTranscript(text) {
-      const words = text.trim().split(/\s+/);
-      wordCount += words.length;
-      let lower = text.toLowerCase();
-      FILLERS.forEach(word => {
-        const count = (lower.match(new RegExp(`\\b${word}\\b`, 'g')) || []).length;
-        fillerWords += count;
-      });
-      document.getElementById("finalTranscript").innerHTML += highlightFiller(text) + "<br>";
+    const fillerRate = Math.round((fillerWords / wordCount) * 100);
+    const clarityPenalty = Math.min(fillerRate * 2, 40);
+    const clarity = 100 - clarityPenalty;
+    const confidence = Math.round(75 + Math.random() * 25);
+    const grammar = evaluateGrammar();
+    const composite = Math.round(clarity * 0.4 + confidence * 0.3 + grammar * 0.3);
+
+    document.getElementById("clarityScore").innerText = `${clarity} / 100`;
+    document.getElementById("fillerCount").innerText = `${fillerWords} (${fillerRate}%)`;
+    document.getElementById("confidenceScore").innerText = `${confidence} / 100`;
+    document.getElementById("grammarScore").innerText = `${grammar} / 100`;
+    document.getElementById("compositeScore").innerText = `${composite} / 100`;
+    resultsDiv.style.display = "block";
+
+    // ✅ Save to sessionStorage - MODIFIED TO MATCH MAIN PAGE STRUCTURE
+    try {
+      // Load existing scores or initialize with defaults
+      const scores = JSON.parse(sessionStorage.getItem("interviewScores")) || {
+        speech: 0,
+        gestures: 0,
+        text: 0
+      };
+
+      // Update only the speech score
+      scores.speech = composite;
+
+      // Save back to sessionStorage
+      sessionStorage.setItem("interviewScores", JSON.stringify(scores));
+      console.log("Speech score saved to sessionStorage:", scores);
+
+      // Optional: Show success message
+      alert("Your speech analysis is complete! The score has been saved to your dashboard.");
+    } catch (e) {
+      console.error("Failed to save score to sessionStorage:", e);
+      alert("Couldn't save your score. Please try again.");
     }
+  }
 
-    function highlightFiller(text) {
-      let result = text;
-      FILLERS.forEach(word => {
-        const regex = new RegExp(`\\b${word}\\b`, 'gi');
-        result = result.replace(regex, `<span class="filler-word">${word}</span>`);
-      });
-      return result;
-    }
+</script>
+  </body>
+  </html>
+  
 
-    function volumeLoop() {
-      if (!isRecording) return;
-      const data = new Uint8Array(analyser.frequencyBinCount);
-      analyser.getByteFrequencyData(data);
-      const avg = data.reduce((a, b) => a + b, 0) / data.length;
-      document.getElementById("volumeMeter").style.width = Math.min(avg, 100) + "%";
-      requestAnimationFrame(volumeLoop);
-    }
-
-    function evaluateGrammar() {
-      const transcriptText = document.getElementById("finalTranscript").textContent;
-      const sentences = transcriptText.split(/[.!?]+/).filter(s => s.trim().length > 0);
-      const totalSentences = sentences.length;
-      let errorCount = 0;
-      sentences.forEach(sentence => {
-        sentence = sentence.trim();
-        if (!sentence) return;
-        if (sentence[0] !== sentence[0].toUpperCase()) errorCount++;
-        const count = sentence.split(/\s+/).length;
-        if (count < 5) errorCount++;
-      });
-      let grammarScore = Math.max(0, 100 - (errorCount * 10));
-      return grammarScore;
-    }
-
-    function showResults() {
-      const fillerRate = Math.round((fillerWords / wordCount) * 100) || 0;
-      const clarity = 100 - Math.min(fillerRate * 3, 50);
-      const confidence = Math.round(80 + Math.random() * 20);
-      const grammar = evaluateGrammar();
-
-      document.getElementById("clarityScore").innerText = `${clarity}/100`;
-      document.getElementById("fillerCount").innerText = `${fillerWords} (${fillerRate}%)`;
-      document.getElementById("confidenceScore").innerText = `${confidence}/100`;
-      document.getElementById("grammarScore").innerText = `${grammar}/100`;
-      document.getElementById("compositeScore").innerText = `${Math.round(clarity * 0.35 + confidence * 0.3 + grammar * 0.35)}/100`;
-
-      document.getElementById("results").style.display = "block";
-    }
-  </script>
-
-</body>
-</html>
+   
